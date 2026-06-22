@@ -2,7 +2,7 @@ import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import { WebglAddon } from '@xterm/addon-webgl';
-import { ZmodemHandler } from './zmodem-handler';
+import { TrzszFilter } from 'trzsz';
 import '@xterm/xterm/css/xterm.css';
 
 export interface SSHConnectionConfig {
@@ -50,6 +50,7 @@ export class SSHTerminal {
   private maxReconnectAttempts: number = 5;
   private reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
   private lastConfig: SSHConnectionConfig | null = null;
+  private trzszFilter: TrzszFilter | null = null;
 
   constructor(containerId: string) {
     this.container = document.getElementById(containerId)!;
@@ -75,12 +76,26 @@ export class SSHTerminal {
       e.preventDefault();
       try {
         const text = await navigator.clipboard.readText();
-        if (text && this.ws?.readyState === WebSocket.OPEN) {
-          this.ws.send(text);
+        if (text) {
+          this.sendTerminalInput(text);
         }
       } catch (err) {
         console.error('Failed to read clipboard', err);
       }
+    });
+
+    this.container.addEventListener('dragover', (event) => {
+      event.preventDefault();
+    });
+
+    this.container.addEventListener('drop', (event) => {
+      event.preventDefault();
+      const items = event.dataTransfer?.items;
+      if (!items || !this.trzszFilter) return;
+
+      this.trzszFilter.uploadFiles(items).catch((err) => {
+        console.error('trzsz upload failed', err);
+      });
     });
   }
 
@@ -125,6 +140,7 @@ export class SSHTerminal {
 
     return new Promise((resolve, reject) => {
       this.ws = new WebSocket(wsUrl.toString());
+      this.ws.binaryType = 'arraybuffer';
 
       this.ws.onopen = () => {
         this.terminal.writeln('\x1b[32m[+] WebSocket connected, sending credentials...\x1b[0m');
@@ -163,6 +179,7 @@ export class SSHTerminal {
     this.resetActiveConnection();
     this.lastConfig = null;
     this.ws = ws;
+    this.ws.binaryType = 'arraybuffer';
     this.terminal.clear();
 
     const termStatus = document.getElementById('term-status');
@@ -179,15 +196,15 @@ export class SSHTerminal {
   private setupWebSocketHandlers(rejectFn?: (reason?: any) => void): void {
     if (!this.ws) return;
 
-    // Zmodem support
-    const zmodemHandler = new ZmodemHandler(
-      (data) => this.terminal.write(data),
-      (data) => {
+    this.trzszFilter = new TrzszFilter({
+      writeToTerminal: (data) => this.writeTrzszDataToTerminal(data),
+      sendToServer: (data) => {
         if (this.ws?.readyState === WebSocket.OPEN) {
           this.ws.send(data);
         }
-      }
-    );
+      },
+      terminalColumns: this.terminal.cols,
+    });
 
     this.ws.onmessage = (event) => {
       if (typeof event.data === 'string') {
@@ -207,14 +224,10 @@ export class SSHTerminal {
               break;
           }
         } catch {
-          this.terminal.write(event.data);
+          this.trzszFilter?.processServerOutput(event.data);
         }
       } else {
-        const reader = new FileReader();
-        reader.onload = () => {
-          zmodemHandler.consume(reader.result as ArrayBuffer);
-        };
-        reader.readAsArrayBuffer(event.data);
+        this.trzszFilter?.processServerOutput(event.data);
       }
     };
 
@@ -240,14 +253,21 @@ export class SSHTerminal {
 
     this.disposables.push(
       this.terminal.onData((data) => {
+        this.sendTerminalInput(data);
+      })
+    );
+
+    this.disposables.push(
+      this.terminal.onBinary((data) => {
         if (this.ws?.readyState === WebSocket.OPEN) {
-          this.ws.send(data);
+          this.trzszFilter?.processBinaryInput(data);
         }
       })
     );
 
     this.disposables.push(
       this.terminal.onResize(({ cols, rows }) => {
+        this.trzszFilter?.setTerminalColumns(cols);
         if (this.ws?.readyState === WebSocket.OPEN) {
           this.ws.send(JSON.stringify({
             type: 'resize',
@@ -257,6 +277,32 @@ export class SSHTerminal {
         }
       })
     );
+  }
+
+  private writeTrzszDataToTerminal(data: string | ArrayBuffer | Uint8Array | Blob): void {
+    if (typeof data === 'string' || data instanceof Uint8Array) {
+      this.terminal.write(data);
+      return;
+    }
+
+    if (data instanceof ArrayBuffer) {
+      this.terminal.write(new Uint8Array(data));
+      return;
+    }
+
+    data.arrayBuffer()
+      .then((buffer) => this.terminal.write(new Uint8Array(buffer)))
+      .catch((err) => console.error('Failed to write trzsz output', err));
+  }
+
+  private sendTerminalInput(data: string): void {
+    if (this.ws?.readyState !== WebSocket.OPEN) return;
+
+    if (this.trzszFilter) {
+      this.trzszFilter.processTerminalInput(data);
+    } else {
+      this.ws.send(data);
+    }
   }
 
   fit(): void {
@@ -300,6 +346,7 @@ export class SSHTerminal {
       this.ws.close(1000);
     }
     this.ws = null;
+    this.trzszFilter = null;
   }
 
   private scheduleReconnect(): void {

@@ -71,7 +71,7 @@
 - **防范中间人攻击 (TOFU)**：首次连接自动提取服务器 Host Key（SHA-256 指纹）并显示，防止被恶意节点窃听。
 - **全功能极客终端**：基于 `@xterm/xterm` 与 `@xterm/addon-webgl` 硬件加速渲染引擎，保证海量日志输出顺滑不卡顿。
 - **个性化 UI**：提供 Cyberpunk、Glacier、Gruvbox 等经典终端主题一键切换，支持移动端适配。
-- **原生文件传输**：集成 zmodem.js，只需在终端中执行 `rz` / `sz` 命令，即可在浏览器直接与服务器双向拖放/下载文件。
+- **原生文件传输**：集成 `trzsz.js`，服务器安装 [`trzsz`](https://trzsz.github.io/go) 后，即可在浏览器终端执行 `trz` / `tsz` 命令直接上传/下载文件，也支持拖拽上传。
 
 <a id="architecture"></a>
 ## 架构说明

@@ -71,7 +71,7 @@
 - **MitM Protection (TOFU)**: Automatically extracts and prints the server's Host Key (SHA-256 fingerprint) on the first connection, preventing eavesdropping by malicious nodes.
 - **Geek Terminal Experience**: Powered by `@xterm/xterm` and the `@xterm/addon-webgl` hardware acceleration rendering engine, ensuring silky smooth scrolling even with massive log outputs.
 - **Customizable UI**: Switch seamlessly between classic terminal themes like Cyberpunk, Glacier, and Gruvbox, fully optimized for mobile devices.
-- **Native File Transfer**: Integrated with `zmodem.js`. Just run `rz` or `sz` commands in the terminal to easily upload/download files via drag & drop directly in the browser.
+- **Native File Transfer**: Integrated with `trzsz.js`. After installing [`trzsz`](https://trzsz.github.io/go) on the server, run `trz` or `tsz` in the terminal to upload/download files directly in the browser, with drag-and-drop upload support.
 
 <a id="architecture"></a>
 ## Architecture
