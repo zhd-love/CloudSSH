@@ -9,6 +9,10 @@ let connectionForm: ConnectionForm | null = null;
 let serverList: ServerList | null = null;
 let isLoggedIn = false;
 
+terminal.setSessionClosedHandler(() => {
+  closeTerminalOrReturn();
+});
+
 // ==================== 独立终端标签页模式 ====================
 
 function isTerminalTab(): boolean {
@@ -38,12 +42,6 @@ function initTerminalTab(): void {
   const ws = new WebSocket(wsUrl);
   ws.binaryType = 'arraybuffer';
   terminal.connectWithWebSocket(ws);
-
-  // 断开连接时关闭标签页
-  document.getElementById('disconnect-btn')?.addEventListener('click', () => {
-    terminal.disconnect();
-    window.close();
-  });
 }
 
 // ==================== 页面切换 ====================
@@ -81,6 +79,30 @@ function showUserSpace(user: { id: number; github_id: number; username: string; 
   );
 }
 
+function closeTerminalOrReturn(): void {
+  terminal.disconnect();
+
+  if (isTerminalTab()) {
+    window.close();
+    return;
+  }
+
+  const termSection = document.getElementById('terminal-section')!;
+  termSection.classList.add('hidden');
+  termSection.classList.remove('flex');
+
+  if (isLoggedIn) {
+    document.getElementById('auth-section')!.classList.add('hidden');
+    document.getElementById('user-space-section')!.classList.remove('hidden');
+    document.getElementById('user-space-section')!.classList.add('flex');
+  } else {
+    showAuthSection();
+  }
+
+  const statusText = document.getElementById('status-text');
+  if (statusText) statusText.innerHTML = '<span class="w-2 h-2 bg-[#353534] inline-block"></span> STATUS: OFFLINE';
+}
+
 function showTerminalFromServer(wsUrl: string, serverName: string): void {
   document.getElementById('auth-section')!.classList.add('hidden');
   document.getElementById('user-space-section')!.classList.add('hidden');
@@ -104,21 +126,7 @@ function showTerminalFromServer(wsUrl: string, serverName: string): void {
 // ==================== 断开连接处理 ====================
 
 document.getElementById('disconnect-btn')?.addEventListener('click', () => {
-  terminal.disconnect();
-  const termSection = document.getElementById('terminal-section')!;
-  termSection.classList.add('hidden');
-  termSection.classList.remove('flex');
-
-  if (isLoggedIn) {
-    // 已登录用户回到用户空间
-    document.getElementById('user-space-section')!.classList.remove('hidden');
-    document.getElementById('user-space-section')!.classList.add('flex');
-  } else {
-    // 匿名用户回到连接表单
-    document.getElementById('auth-section')!.classList.remove('hidden');
-  }
-
-  document.getElementById('status-text')!.innerHTML = '<span class="w-2 h-2 bg-[#353534] inline-block"></span> STATUS: OFFLINE';
+  closeTerminalOrReturn();
 });
 
 // ==================== 主题切换 ====================
