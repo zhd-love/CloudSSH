@@ -10,7 +10,7 @@ let serverList: ServerList | null = null;
 let isLoggedIn = false;
 
 terminal.setSessionClosedHandler(() => {
-  closeTerminalOrReturn();
+  showOfflineUI();
 });
 
 // ==================== 独立终端标签页模式 ====================
@@ -79,28 +79,26 @@ function showUserSpace(user: { id: number; github_id: number; username: string; 
   );
 }
 
-function closeTerminalOrReturn(): void {
-  terminal.disconnect();
-
+function showOfflineUI(): void {
   if (isTerminalTab()) {
     window.close();
     return;
   }
 
-  const termSection = document.getElementById('terminal-section')!;
-  termSection.classList.add('hidden');
-  termSection.classList.remove('flex');
+  const termSection = document.getElementById('terminal-section');
+  if (termSection) {
+    termSection.classList.add('hidden');
+    termSection.classList.remove('flex');
+  }
 
   if (isLoggedIn) {
-    document.getElementById('auth-section')!.classList.add('hidden');
-    document.getElementById('user-space-section')!.classList.remove('hidden');
-    document.getElementById('user-space-section')!.classList.add('flex');
+    document.getElementById('user-space-section')?.classList.remove('hidden');
+    document.getElementById('user-space-section')?.classList.add('flex');
   } else {
     showAuthSection();
   }
 
-  const statusText = document.getElementById('status-text');
-  if (statusText) statusText.innerHTML = '<span class="w-2 h-2 bg-[#353534] inline-block"></span> STATUS: OFFLINE';
+  document.getElementById('status-text')!.innerHTML = '<span class="w-2 h-2 bg-[#353534] inline-block"></span> STATUS: OFFLINE';
 }
 
 function showTerminalFromServer(wsUrl: string, serverName: string): void {
@@ -126,7 +124,8 @@ function showTerminalFromServer(wsUrl: string, serverName: string): void {
 // ==================== 断开连接处理 ====================
 
 document.getElementById('disconnect-btn')?.addEventListener('click', () => {
-  closeTerminalOrReturn();
+  terminal.disconnect();
+  showOfflineUI();
 });
 
 // ==================== 主题切换 ====================
